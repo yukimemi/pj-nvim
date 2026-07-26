@@ -2,7 +2,10 @@
     predates this layer. `is defined` is used rather than a `default` filter
     because Tera cannot express an empty-map fallback for the intermediate
     `vars.nvim` lookup, and `set_global` because a plain `set` inside an `if`
-    would not escape the block. -#}
+    would not escape the block.
+
+    GitHub Actions expressions share Tera's `{{ }}` delimiters, so every
+    `${{ … }}` below is wrapped in `{% raw %}` to survive rendering. -#}
 {%- set_global runner = "mini" -%}
 {%- if vars.nvim is defined and vars.nvim.test_runner is defined -%}
 {%- set_global runner = vars.nvim.test_runner -%}
@@ -18,20 +21,20 @@ on:
 
 jobs:
   test:
-    name: Test (${{ matrix.os }} / nvim ${{ matrix.nvim }})
+    name: {% raw %}test (${{ matrix.os }} / nvim ${{ matrix.nvim }}){% endraw %}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         nvim: [stable, nightly]
-    runs-on: ${{ matrix.os }}
+    runs-on: {% raw %}${{ matrix.os }}{% endraw %}
     steps:
       - uses: actions/checkout@{{ vars.actions.checkout }}
 
       - uses: rhysd/action-setup-vim@{{ vars.actions.rhysd_action_setup_vim }}
         with:
           neovim: true
-          version: ${{ matrix.nvim }}
+          version: {% raw %}${{ matrix.nvim }}{% endraw %}
 {% if runner == "plenary" %}
       - name: Clone plenary.nvim
         uses: actions/checkout@{{ vars.actions.checkout }}
@@ -85,6 +88,6 @@ jobs:
       - uses: actions/checkout@{{ vars.actions.checkout }}
       - uses: JohnnyMorganz/stylua-action@{{ vars.actions.stylua_action }}
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
           version: latest
           args: --check .
