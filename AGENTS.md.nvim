@@ -1,0 +1,71 @@
+### Neovim plugin workflow
+
+This repo follows the shared Neovim plugin conventions. The
+language-agnostic conventions block above (`kata:agents:base:*`)
+covers git workflow, PR review cycle, and worktree usage.
+
+### Test / lint
+
+There is no build step — Lua is interpreted, so the whole gate is
+"tests pass and stylua is clean":
+
+```sh
+stylua --check .                    # format gate (what CI runs)
+stylua .                            # apply formatting
+```
+
+Tests run through Neovim itself, one file per invocation. Which
+framework is in play depends on `nvim.test_runner` in
+`.kata/vars.toml`:
+
+```sh
+# test_runner = "mini"  (deps/mini.nvim)
+nvim -u NONE -l scripts/run_tests.lua tests/<plugin>/test_foo.lua
+
+# test_runner = "plenary"  (deps/plenary.nvim)
+nvim --headless --noplugin -u tests/minimal_init.lua \
+  -c "PlenaryBustedFile tests/<plugin>/foo_spec.lua"
+```
+
+**Run one file per `nvim` invocation, and match CI's discovery
+pattern.** CI enumerates specs with `find tests -type f -name …` and
+loops in the shell rather than letting the framework walk the
+directory: `PlenaryBustedDirectory` spawns `pwsh` on Windows runners
+to enumerate files, and pwsh's ~5s startup blows plenary's internal
+timeout. A file-at-a-time loop behaves identically on all three OSes
+and keeps a crash in one spec from taking the rest of the suite with
+it.
+
+### Test dependencies live in `deps/`
+
+CI clones the framework into `deps/mini.nvim` or `deps/plenary.nvim`.
+Keep `deps/` out of the repo (it is in `.gitignore`) and out of
+formatting (`.styluaignore`). If your `minimal_init.lua` hardcodes a
+different path, fix the init file rather than the workflow — the
+workflow is kata-managed and a local edit will be reverted.
+
+### Neovim version support
+
+CI runs the full matrix: `ubuntu` / `macos` / `windows` x `stable` /
+`nightly`. A nightly-only failure is still a failure — either guard
+the API behind a version check or fix the call. Don't reach for a
+newer API without confirming it exists on `stable`; `vim.fn.has()` or
+a `pcall` around the lookup is the usual guard.
+
+### Lint / format policy
+
+`.stylua.toml` is kata-managed (sourced from `yukimemi/pj-nvim`).
+Edits to it in this repo won't survive the next `kata apply`; if a
+setting is wrong, push the fix to `yukimemi/pj-nvim` so every Neovim
+plugin using these templates picks it up. `.styluaignore` is
+consumer-owned after the first apply — extend it freely.
+
+### CI workflow
+
+`.github/workflows/ci.yml` is kata-managed. The source lives in
+`yukimemi/pj-nvim/.github/workflows/ci.yml.tera` (the `.tera` suffix
+keeps GitHub Actions from running the source inside pj-nvim itself
+and opts the file into kata's Tera rendering). Action versions are
+pinned in `.kata/vars.toml` and bumped by Renovate, so don't edit
+them inline in the workflow — the bump would be clobbered on the
+next apply.

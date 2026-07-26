@@ -1,0 +1,28 @@
+# Neovim-layer variables. Merged into the consumer's `.kata/vars.toml`
+# via `[[file]] how = "merge-toml"`, composing with pj-base's universal
+# pins (actions/checkout, peter-evans/create-pull-request).
+#
+# Each `# renovate:` annotation tells Renovate which datasource and
+# upstream repo the value tracks; Renovate bumps these via the
+# customManager declared in pj-base's `default.json`. Bumps land in
+# this template repo's source file and in each consumer's
+# `.kata/vars.toml` independently.
+
+[actions]
+# renovate: datasource=github-tags depName=rhysd/action-setup-vim
+rhysd_action_setup_vim = "v1"
+# renovate: datasource=github-tags depName=JohnnyMorganz/stylua-action
+stylua_action = "v4"
+
+[nvim]
+# Which test framework `ci.yml` sets up and invokes.
+#
+#   "mini"    — clones echasnovski/mini.nvim into deps/mini.nvim and runs
+#               each `tests/**/test_*.lua` via `scripts/run_tests.lua`.
+#   "plenary" — clones nvim-lua/plenary.nvim into deps/plenary.nvim and
+#               runs each `tests/**/*_spec.lua` via `PlenaryBustedFile`
+#               with `tests/minimal_init.lua`.
+#
+# CONSUMER-OWNED: seeded once on first apply, never overwritten
+# afterwards. Change it here in your `.kata/vars.toml`, not upstream.
+test_runner = "mini"

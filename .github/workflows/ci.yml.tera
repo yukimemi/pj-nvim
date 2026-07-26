@@ -1,0 +1,83 @@
+{%- set nvim_vars = vars.nvim | default(value={}) -%}
+{%- set runner = nvim_vars.test_runner | default(value="mini") -%}
+# kata-managed — source: yukimemi/pj-nvim/.github/workflows/ci.yml.tera
+# Local edits are reverted on the next `kata apply`. Push fixes upstream.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }} / nvim ${{ matrix.nvim }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        nvim: [stable, nightly]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@{{ vars.actions.checkout }}
+
+      - uses: rhysd/action-setup-vim@{{ vars.actions.rhysd_action_setup_vim }}
+        with:
+          neovim: true
+          version: ${{ matrix.nvim }}
+{% if runner == "plenary" %}
+      - name: Clone plenary.nvim
+        uses: actions/checkout@{{ vars.actions.checkout }}
+        with:
+          repository: nvim-lua/plenary.nvim
+          path: deps/plenary.nvim
+
+      - name: Run tests
+        shell: bash
+        run: |
+          # Specs are enumerated in the shell rather than with
+          # PlenaryBustedDirectory: that command spawns pwsh on Windows
+          # runners to walk the directory, and pwsh's ~5s startup blows
+          # plenary's internal timeout. Running each spec in its own nvim
+          # invocation behaves identically on Linux / macOS / Windows.
+          set -euo pipefail
+          status=0
+          while IFS= read -r spec; do
+            echo "::group::$spec"
+            nvim --headless --noplugin -u tests/minimal_init.lua \
+              -c "PlenaryBustedFile $spec" || status=$?
+            echo "::endgroup::"
+          done < <(find tests -type f -name '*_spec.lua' | sort)
+          exit $status
+{% else %}
+      - name: Clone mini.nvim
+        uses: actions/checkout@{{ vars.actions.checkout }}
+        with:
+          repository: echasnovski/mini.nvim
+          path: deps/mini.nvim
+
+      - name: Run tests
+        shell: bash
+        run: |
+          # One nvim invocation per test file so a crash in one file
+          # cannot take the rest of the suite down with it, and so the
+          # failing file is obvious from the group heading.
+          set -euo pipefail
+          status=0
+          while IFS= read -r f; do
+            echo "::group::$f"
+            nvim -u NONE -l scripts/run_tests.lua "$f" || status=$?
+            echo "::endgroup::"
+          done < <(find tests -type f -name 'test_*.lua' | sort)
+          exit $status
+{% endif %}
+  lint:
+    name: stylua
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@{{ vars.actions.checkout }}
+      - uses: JohnnyMorganz/stylua-action@{{ vars.actions.stylua_action }}
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
+          args: --check .

@@ -1,0 +1,73 @@
+name = "pj-nvim"
+version = "0.1.0"
+
+# Neovim plugin layer. Brings the CI matrix (3 OS x nvim
+# stable/nightly), the stylua lint gate, and the Lua formatting
+# policy every Neovim plugin using these templates shares.
+# Compose under `pj-base`.
+#
+# There is no build system to wire up (Lua is interpreted), so unlike
+# pj-rust this layer ships no task-runner file and leaves pj-base's
+# `apm install` renri hook alone.
+
+# CI workflow. Same `.tera` suffix story as pj-rust's ci.yml.tera:
+# (1) GitHub Actions only runs `.yml`/`.yaml` under
+# `.github/workflows/`, so the suffixed source isn't executed inside
+# pj-nvim itself; (2) kata Tera-renders `.tera` files at apply time
+# and strips the suffix, so consumers receive `ci.yml`.
+#
+# The test step branches on `vars.nvim.test_runner` because the
+# plugins split on framework: most use mini.nvim, rvpm.nvim uses
+# plenary.nvim. Everything around the test step — the matrix, the
+# nvim setup, the stylua lint job — is identical across all of them,
+# which is the whole reason this layer is worth having.
+[[file]]
+src = ".github/workflows/ci.yml.tera"
+how = "overwrite"
+when = "always"
+
+# Lua formatting policy — shared so `stylua --check` behaves
+# identically everywhere. Bumped centrally here; local edits in
+# consumer PJs are reverted on the next `kata apply`.
+[[file]]
+src = ".stylua.toml"
+how = "overwrite"
+when = "always"
+
+# Paths stylua must not touch. `when = "once"` rather than
+# "always": vendored dependency dirs differ per plugin (deps/,
+# tests/plenary/, ...), so the consumer owns this list after the
+# first apply.
+[[file]]
+src = ".styluaignore"
+how = "overwrite"
+when = "once"
+
+# Neovim-layer action pins plus the test-runner selector, merged
+# into the consumer's `.kata/vars.toml` on top of pj-base's
+# universal seed. `merge-toml` with an explicit `paths` list writes
+# only these keys, leaving pj-base's `actions.checkout` /
+# `actions.create_pull_request` pins untouched.
+#
+# `when = "once"`: `nvim.test_runner` is CONSUMER-owned. A
+# `when = "always"` back-fill (the pattern pj-base uses for
+# `actions.claude_code_action`) would be wrong here — it would
+# reset a plugin that selected "plenary" back to the "mini"
+# default on every apply.
+[[file]]
+src = "vars.nvim.toml"
+dst = ".kata/vars.toml"
+how = "merge-toml"
+when = "once"
+paths = ["actions.rhysd_action_setup_vim", "actions.stylua_action", "nvim.test_runner"]
+
+# Neovim-layer agent guidance — test/lint commands, the runtimepath
+# rules, and the kata-managed-file notes. Lives inside its own
+# marker block so pj-base's language-agnostic block can coexist in
+# the same AGENTS.md.
+[[file]]
+src = "AGENTS.md.nvim"
+dst = "AGENTS.md"
+how = "merge-section"
+when = "always"
+marker = { begin = "<!-- kata:agents:nvim:begin -->", end = "<!-- kata:agents:nvim:end -->" }
