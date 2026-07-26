@@ -1,5 +1,12 @@
-{%- set nvim_vars = vars.nvim | default(value={}) -%}
-{%- set runner = nvim_vars.test_runner | default(value="mini") -%}
+{#- Resolve the test framework, tolerating a consumer whose `.kata/vars.toml`
+    predates this layer. `is defined` is used rather than a `default` filter
+    because Tera cannot express an empty-map fallback for the intermediate
+    `vars.nvim` lookup, and `set_global` because a plain `set` inside an `if`
+    would not escape the block. -#}
+{%- set_global runner = "mini" -%}
+{%- if vars.nvim is defined and vars.nvim.test_runner is defined -%}
+{%- set_global runner = vars.nvim.test_runner -%}
+{%- endif -%}
 # kata-managed — source: yukimemi/pj-nvim/.github/workflows/ci.yml.tera
 # Local edits are reverted on the next `kata apply`. Push fixes upstream.
 name: CI

@@ -10,6 +10,30 @@ version = "0.1.0"
 # pj-rust this layer ships no task-runner file and leaves pj-base's
 # `apm install` renri hook alone.
 
+# Variables first: `ci.yml.tera` reads `nvim.test_runner` from the
+# consumer's `.kata/vars.toml`, so this entry has to land before the
+# workflow is rendered on a first apply. (`ci.yml.tera` also guards the
+# lookup with `is defined`, so a stale consumer still renders — this
+# ordering is what makes the value actually take effect.)
+#
+# Neovim-layer action pins plus the test-runner selector, merged into
+# the consumer's `.kata/vars.toml` on top of pj-base's universal seed.
+# `merge-toml` with an explicit `paths` list writes only these keys,
+# leaving pj-base's `actions.checkout` / `actions.create_pull_request`
+# pins untouched.
+#
+# `when = "once"`: `nvim.test_runner` is CONSUMER-owned. A
+# `when = "always"` back-fill (the pattern pj-base uses for
+# `actions.claude_code_action`) would be wrong here — it would reset a
+# plugin that selected "plenary" back to the "mini" default on every
+# apply.
+[[file]]
+src = "vars.nvim.toml"
+dst = ".kata/vars.toml"
+how = "merge-toml"
+when = "once"
+paths = ["actions.rhysd_action_setup_vim", "actions.stylua_action", "nvim.test_runner"]
+
 # CI workflow. Same `.tera` suffix story as pj-rust's ci.yml.tera:
 # (1) GitHub Actions only runs `.yml`/`.yaml` under
 # `.github/workflows/`, so the suffixed source isn't executed inside
@@ -42,24 +66,6 @@ when = "always"
 src = ".styluaignore"
 how = "overwrite"
 when = "once"
-
-# Neovim-layer action pins plus the test-runner selector, merged
-# into the consumer's `.kata/vars.toml` on top of pj-base's
-# universal seed. `merge-toml` with an explicit `paths` list writes
-# only these keys, leaving pj-base's `actions.checkout` /
-# `actions.create_pull_request` pins untouched.
-#
-# `when = "once"`: `nvim.test_runner` is CONSUMER-owned. A
-# `when = "always"` back-fill (the pattern pj-base uses for
-# `actions.claude_code_action`) would be wrong here — it would
-# reset a plugin that selected "plenary" back to the "mini"
-# default on every apply.
-[[file]]
-src = "vars.nvim.toml"
-dst = ".kata/vars.toml"
-how = "merge-toml"
-when = "once"
-paths = ["actions.rhysd_action_setup_vim", "actions.stylua_action", "nvim.test_runner"]
 
 # Neovim-layer agent guidance — test/lint commands, the runtimepath
 # rules, and the kata-managed-file notes. Lives inside its own
